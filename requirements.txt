@@ -1,0 +1,10 @@
+streamlit
+apify-client
+pandas
+matplotlib
+wordcloud
+google-api-python-client
+langchain
+textblob
+openai
+python-dotenv
