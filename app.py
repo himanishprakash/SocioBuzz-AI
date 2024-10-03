@@ -12,21 +12,17 @@ from textblob import TextBlob
 from openai import OpenAI
 import base64
 from io import BytesIO
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Retrieve API keys from environment variables
-openai_api_key = os.getenv('OPENAI_API_KEY')
-youtube_api_key = os.getenv('YOUTUBE_API_KEY')
-apify_api_key = os.getenv('APIFY_API_KEY')
 
 # Initialize the OpenAI client
+openai_api_key = os.getenv('OPENAI_API_KEY')
+youtube_api_key = os.getenv('YOUTUBE_API_KEY')
+apify_api_key = os.getenv('apify_api_key')
 client = OpenAI(api_key=openai_api_key)
 
 # Set up YouTube API client
-youtube = build('youtube', 'v3', developerKey=youtube_api_key)
+YOUTUBE_API_SERVICE_NAME = 'youtube'
+YOUTUBE_API_VERSION = 'v3'
+youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=youtube_api_key)
 
 # Function to convert Matplotlib plots to base64 images
 def fig_to_base64(fig):
@@ -46,7 +42,7 @@ def fetch_videos_by_keyword(keyword, max_results):
         maxResults=max_results
     ).execute()
 
-    video_links = [[f"https://www.youtube.com/watch?v={item['id']['videoId']}"] for item in search_response['items']]
+    video_links = [f"https://www.youtube.com/watch?v={item['id']['videoId']}" for item in search_response['items']]
     return video_links
 
 # Function to fetch video links for a channel ID
@@ -59,7 +55,7 @@ def fetch_videos_by_channel_id(channel_id, max_results):
         order='date'
     ).execute()
 
-    video_links = [[f"https://www.youtube.com/watch?v={item['id']['videoId']}"] for item in search_response['items']]
+    video_links = [f"https://www.youtube.com/watch?v={item['id']['videoId']}" for item in search_response['items']]
     return video_links
 
 def get_rss_feed(youtube_links):
@@ -93,6 +89,9 @@ def summarize_text_with_gpt4(text_chunks):
     combined_summary = " ".join(summaries)
     return combined_summary
 
+
+
+
 # Function to get sentiment using OpenAI API for Instagram
 def get_sentiment(comment):
     response = client.chat.completions.create(
@@ -121,19 +120,21 @@ def summarize_analysis(data_summary, table_data):
     summary = response.choices[0].message.content.strip()
     return summary
 
-def main():
-    st.title("SocioBuzz AI: Social Media Analytics App")
-
-    # Add the logo in the center
-    logo_path = "logo.png"  # Ensure the logo image is in the same directory or provide the correct path
-    st.markdown(
-        f"""
-        <div style="display: flex; justify-content: center;">
-            <img src="data:image/png;base64,{base64.b64encode(open(logo_path, 'rb').read()).decode()}" width="200">
-        </div>
-        """,
-        unsafe_allow_html=True
+def get_summary(text):
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are a smart reviewer designed to summarize text."},
+            {"role": "user", "content": f"Summarize the following text:\n\n{text}"},
+            {"role": "user", "content": "Provide a brief summary of the text."},
+            {"role": "user", "content": "What are the key points in the text? highlight the main ideas."}
+        ]
     )
+    summary = response.choices[0].message.content.strip()
+    return summary
+
+def main():
+    st.title("SocioBuzz: Social Media Analysis Tool")
 
     app_mode = st.selectbox("Choose the app", ["Instagram", "YouTube"])
 
@@ -293,17 +294,15 @@ def main():
 
             st.write("RSS Feed Summary:")
             summary = summarize_text_with_gpt4(text_chunks)
-            if "Positive" in summary:
-                st.markdown(f"<span style='color: green;'>{summary}</span>", unsafe_allow_html=True)
+            summarizer = get_summary(summary)
+            
+            if "Positive" in summarizer:
+                st.markdown(f"<span style='color: green;'>{summarizer}</span>", unsafe_allow_html=True)
             else:
-                st.write(summary)
+                st.write(summarizer)
 
             st.write("Sentiment Analysis:")
-            polarity, subjectivity = perform_sentiment_analysis(summary)
-            st.write(f"Polarity: {polarity}, Subjectivity: {subjectivity}")
-            
-            st.write("Sentiment Analysis:")
-            polarity, subjectivity = perform_sentiment_analysis(summary)
+            polarity, subjectivity = perform_sentiment_analysis(summarizer)
             st.write(f"Polarity: {polarity}, Subjectivity: {subjectivity}")
 
             sentiments = {'Positive': 0, 'Neutral': 0, 'Negative': 0}
